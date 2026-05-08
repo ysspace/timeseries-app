@@ -542,20 +542,18 @@ def generate_story(series,val_col,freq_label,sp,adf_result,decomp,metrics_df,bes
     if decomp is not None:
         sv=float(np.var(decomp.seasonal.dropna())); rv=float(np.var(decomp.resid.dropna()))
         ss=max(0,1-rv/(sv+rv+1e-9))
-        seas_str=f"매 {sp}스텝마다 반복되는 **뚜렷한 계절 패턴**이 있습니다 (강도 {ss:.0%})." if ss>0.4 else f"계절성은 약하게 나타납니다 (강도 {ss:.0%})."
+        seas_str=f"매 {sp}스텝마다 반복되는 <b>뚜렷한 계절 패턴</b>이 있습니다 (강도 {ss:.0%})." if ss>0.4 else f"계절성은 약하게 나타납니다 (강도 {ss:.0%})."
     if best_model and best_model in metrics_df.index and 'Naive' in metrics_df.index:
         br=metrics_df.loc[best_model,'RMSE']; nr=metrics_df.loc['Naive','RMSE']
         imp=(nr-br)/nr*100 if nr>0 else 0
-        model_str=f"**{best_model}** 모델이 선택되었으며 Naive 대비 **{imp:.1f}% 더 정확**합니다."
-    else: model_str=f"**{best_model}** 모델이 선택되었습니다."
+        model_str=f"<b>{best_model}</b> 모델이 선택되었으며 Naive 대비 <b>{imp:.1f}% 더 정확</b>합니다."
+    else: model_str=f"<b>{best_model}</b> 모델이 선택되었습니다."
     stat_str="정상 시계열" if adf_result['is_stationary'] else f"비정상 시계열 (p={adf_result['pvalue']:.3f}, d={arima_order[1]} 차분 적용)"
-    return f"""📊 **{start} ~ {end}** | **{n}개** {freq_label} 관측치
-
-평균 **{mean_v:.1f}**, 범위 **{min_v:.1f} ~ {max_v:.1f}** 이며, 후반부가 전반부 대비 **{tp:.1f}% {td}** 추세입니다.
-{seas_str}
-
-ADF 검정 결과 **{stat_str}**이며, ARIMA 차수 **{arima_order}** (**{detect_arima_case(arima_order)}**) 가 추정됩니다.
-{model_str} 종합 신뢰 점수 **{trust_total:.0f}/100점**."""
+    return f"""📊 <b>{start} ~ {end}</b> | <b>{n}개</b> {freq_label} 관측치<br><br>
+평균 <b>{mean_v:.1f}</b>, 범위 <b>{min_v:.1f} ~ {max_v:.1f}</b> 이며, 후반부가 전반부 대비 <b>{tp:.1f}% {td}</b> 추세입니다.
+{seas_str}<br><br>
+ADF 검정 결과 <b>{stat_str}</b>이며, ARIMA 차수 <b>{arima_order}</b> (<b>{detect_arima_case(arima_order)}</b>) 가 추정됩니다.
+{model_str} 종합 신뢰 점수 <b>{trust_total:.0f}/100점</b>."""
 
 def generate_model_reason(best_model,metrics_df,decomp,sp,adf_result,arima_order):
     reasons=[]
@@ -650,22 +648,29 @@ def plot_acf_pacf(series,lags=24):
 
 def plot_forecast(series,val_col,test_results,future_results,best_model,train_end):
     fig=go.Figure()
+    # 실제 데이터
     fig.add_trace(go.Scatter(x=series.index,y=series[val_col],
                              name='실제 데이터',mode='lines',
                              line=dict(color='#1e293b',width=2.5)))
+    # 비최적 모델 먼저 (뒤에 깔리도록) - 연한 회색
     for name,info in test_results.items():
-        is_best=(name==best_model); color=COLORS.get(name,'#888')
-        if is_best and info.get('ci') is not None:
+        if name==best_model: continue
+        fig.add_trace(go.Scatter(
+            x=info['index'],y=info['pred'],name=name,mode='lines',
+            line=dict(color='#cbd5e1',dash='dot',width=1),opacity=0.6))
+    # 최적 모델: 신뢰구간 + 굵은 컬러 선
+    if best_model and best_model in test_results:
+        info=test_results[best_model]; color=COLORS.get(best_model,'#6366f1')
+        if info.get('ci') is not None:
             ci=info['ci']; il=list(info['index'])
             fig.add_trace(go.Scatter(
                 x=il+il[::-1],y=list(ci[:,1])+list(ci[:,0])[::-1],
-                fill='toself',fillcolor=f'rgba({_hex_rgb(color)},0.12)',
-                line=dict(color='rgba(0,0,0,0)'),name=f'{name} 95% CI',hoverinfo='skip'))
+                fill='toself',fillcolor=f'rgba({_hex_rgb(color)},0.18)',
+                line=dict(color='rgba(0,0,0,0)'),name='95% 신뢰구간',hoverinfo='skip'))
         fig.add_trace(go.Scatter(
-            x=info['index'],y=info['pred'],name=f'{name}',mode='lines',
-            line=dict(color=color,dash='solid' if is_best else 'dot',
-                      width=2.5 if is_best else 1.3),
-            opacity=1.0 if is_best else 0.5))
+            x=info['index'],y=info['pred'],name=f'{best_model} ★ 최적',mode='lines',
+            line=dict(color=color,dash='solid',width=3)))
+    # 미래 예측
     if best_model and best_model in future_results:
         fi=future_results[best_model]; color=COLORS.get(best_model,'#6366f1')
         if fi.get('ci') is not None:
@@ -677,7 +682,7 @@ def plot_forecast(series,val_col,test_results,future_results,best_model,train_en
         fig.add_trace(go.Scatter(
             x=fi['index'],y=fi['pred'],name=f'{best_model} 미래 예측',
             mode='lines+markers',line=dict(color=color,width=3,dash='dash'),
-            marker=dict(size=5)))
+            marker=dict(size=6,symbol='circle')))
         if len(fi['index'])>0:
             fig.add_vrect(x0=str(fi['index'][0]),x1=str(fi['index'][-1]),
                           fillcolor='rgba(99,102,241,0.04)',layer='below',line_width=0,
@@ -685,7 +690,7 @@ def plot_forecast(series,val_col,test_results,future_results,best_model,train_en
     fig.add_vline(x=int(train_end.timestamp()*1000),line_dash='dash',
                   line_color='#94a3b8',opacity=0.8,
                   annotation_text='훈련 | 테스트',annotation_position='top right')
-    fig=styled_layout(fig,'예측 결과 (음영 = 95% 신뢰구간)',500)
+    fig=styled_layout(fig,f'예측 결과 — 최적 모델: {best_model} (음영=95% 신뢰구간)',500)
     fig.update_layout(legend=dict(orientation='h',yanchor='bottom',y=1.02,xanchor='right',x=1))
     return fig
 
@@ -738,7 +743,7 @@ def plot_model_comparison(metrics_df,metric='RMSE'):
     valid=[v for v in vals if not np.isnan(v)]
     if not valid: return go.Figure()
     min_v=min(valid)
-    colors=['#10b981' if (not np.isnan(v) and v==min_v) else '#6366f1' for v in vals]
+    colors=['#10b981' if (not np.isnan(v) and v==min_v) else '#e2e8f0' for v in vals]
     fig=go.Figure(go.Bar(
         x=metrics_df.index.tolist(),y=vals,marker_color=colors,
         text=[f'{v:.3f}' if not np.isnan(v) else 'N/A' for v in vals],
@@ -1213,11 +1218,11 @@ def main():
                 m=metrics_df.loc[best_model]
                 c1,c2=st.columns(2)
                 interps=[
-                    ('blue','MAE',f"평균 오차: **{m['MAE']:.2f}**"),
-                    ('slate','RMSE',f"큰 오차 민감: **{m['RMSE']:.2f}**"),
+                    ('blue','MAE',f"평균 오차: <b>{m['MAE']:.2f}</b>"),
+                    ('slate','RMSE',f"큰 오차 민감: <b>{m['RMSE']:.2f}</b>"),
                     ('green' if m['MASE']<1 else 'yellow','MASE',
-                     f"{'Naive보다 **정확** ✅' if m['MASE']<1 else 'Naive보다 **부정확** ⚠️'} (MASE={m['MASE']:.3f})"),
-                    ('blue','MAPE',f"상대 오차: **{m['MAPE']:.1f}%**"),
+                     f"{'Naive보다 <b>정확</b> ✅' if m['MASE']<1 else 'Naive보다 <b>부정확</b> ⚠️'} (MASE={m['MASE']:.3f})"),
+                    ('blue','MAPE',f"상대 오차: <b>{m['MAPE']:.1f}%</b>"),
                 ]
                 for i,(clr,name,txt) in enumerate(interps):
                     with (c1 if i%2==0 else c2):
@@ -1286,25 +1291,7 @@ def main():
             with (c1 if i%2==0 else c2):
                 st.markdown(f'<div class="card card-{clr}">{txt}</div>',unsafe_allow_html=True)
 
-        # 강의 개념 연결
-        st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>강의 개념 연결</div>',unsafe_allow_html=True)
-        concepts_map=[
-            ("ADF 검정",'정상성 판단','정상' if adf_result['is_stationary'] else f'비정상→d={d_val}'),
-            ("시계열 분해",'추세·계절·잔차 분리','성공' if decomp else '데이터 부족'),
-            ("ACF/PACF",'ARIMA 차수 추정',f'p={arima_order[0]},d={arima_order[1]},q={arima_order[2]}'),
-            ("AR/MA/ARMA",'ARIMA 특수 케이스',arima_case),
-            ("ARIMA",'자기회귀 예측',f'차수 {arima_order}'),
-            ("SARIMA",'계절성 ARIMA','포함' if use_sarima else '미포함'),
-            ("SES/Holt/HW",'지수 평활법','훈련 완료'),
-            ("잔차 진단",'4종 검정',f'LB:{"✅" if not np.isnan(lb_p) and lb_p>0.05 else "⚠️"} JB:{"✅" if not np.isnan(jb_p) and jb_p>0.05 else "⚠️"} DW:{"✅" if not np.isnan(dw_s) and 1.5<dw_s<2.5 else "⚠️"}'),
-            ("Naive 기준선",'유용성 검증','MASE로 비교'),
-        ]
-        rows_a=concepts_map[:5]; rows_b=concepts_map[5:]
-        c1,c2=st.columns(2)
-        for col,rows in [(c1,rows_a),(c2,rows_b)]:
-            with col:
-                for concept,apply,result in rows:
-                    st.markdown(f'<div class="card card-slate" style="padding:0.6rem 0.9rem;margin-bottom:0.3rem;"><b>{concept}</b> — {apply}<br><span style="color:#64748b;font-size:0.82rem;">{result}</span></div>',unsafe_allow_html=True)
+
 
     # ──────────────────────────────────────────────────────────────
     # 탭 6: 다운로드
