@@ -1006,3 +1006,321 @@ def main():
         return
 
     # ── 열 선택
+    with st.expander("🔧 열 설정 확인 / 변경",expanded=(date_col is None)):
+        ac=list(df_raw.columns)
+        c1,c2=st.columns(2)
+        with c1:
+            di=ac.index(date_col) if date_col in ac else 0
+            date_col=st.selectbox("날짜 열",ac,index=di)
+        with c2:
+            vc=[c for c in ac if c!=date_col]
+            vi=vc.index(val_col) if val_col in vc else 0
+            val_col=st.selectbox("값 열 (예측 대상)",vc,index=vi)
+
+    try: series,dup_count,missing_before=load_and_validate(df_raw,date_col,val_col)
+    except Exception as e: st.error(f"❌ 전처리 오류: {e}"); st.stop()
+
+    n=len(series)
+    if n<16: st.error(f"❌ 데이터 부족 ({n}행)"); st.stop()
+
+    freq_label,freq_str,sp=detect_freq(series.index)
+    adf_result =run_adf(series[val_col])
+    d_val      =1 if not adf_result['is_stationary'] else 0
+    arima_order=auto_arima_order(series[val_col],d_val) if use_auto_arima else (1,d_val,1)
+    decomp     =get_decomposition(series[val_col],sp)
+
+    test_n =max(4,int(n*test_ratio/100))
+    train_n=n-test_n
+    train_s=series[val_col].iloc[:train_n]
+    test_s =series[val_col].iloc[train_n:]
+    train_end=series.index[train_n-1]
+
+    with st.spinner("🔄 모델 훈련 중..."):
+        runners={
+            'Naive':       lambda:(*naive_forecast(train_s,test_n),None),
+            'MovAvg':      lambda:(*moving_average_forecast(train_s,test_n),None),
+            'SES':         lambda:(*ses_forecast(train_s,test_n),None),
+            'Holt':        lambda:(*holt_forecast(train_s,test_n),None),
+            'HoltWinters': lambda:(*holtwinters_forecast(train_s,test_n,sp),None),
+            'ARIMA':       lambda:arima_forecast(train_s,test_n,arima_order),
+        }
+        if use_sarima and n>=sp*2+4:
+            runners['SARIMA']=lambda:sarima_forecast(train_s,test_n,arima_order,sp)
+
+        test_results={}; all_metrics={}
+        best_model=None; best_rmse=float('inf')
+
+        for name,fn in runners.items():
+            try:
+                result=fn(); pred=np.array(result[0],dtype=float)
+                fit=result[1]; ci=result[2]
+                if ci is None:
+                    rs=float(np.std(test_s.values-pred)) if len(pred)==len(test_s) else 1.0
+                    ci=np.column_stack([pred-1.96*rs,pred+1.96*rs])
+                test_results[name]={'pred':pred,'index':test_s.index,'ci':ci}
+                m=compute_metrics(test_s.values,pred,train_s.values,fit)
+                all_metrics[name]=m
+                if not np.isnan(m['RMSE']) and m['RMSE']<best_rmse:
+                    best_rmse=m['RMSE']; best_model=name
+            except Exception as e:
+                st.warning(f"⚠️ {name} 실패: {e}")
+
+        metrics_df=pd.DataFrame(all_metrics).T if all_metrics else pd.DataFrame()
+
+        future_runners={
+            'Naive':       lambda:(*naive_forecast(series[val_col],forecast_horizon),None),
+            'SES':         lambda:(*ses_forecast(series[val_col],forecast_horizon),None),
+            'Holt':        lambda:(*holt_forecast(series[val_col],forecast_horizon),None),
+            'HoltWinters': lambda:(*holtwinters_forecast(series[val_col],forecast_horizon,sp),None),
+            'ARIMA':       lambda:arima_forecast(series[val_col],forecast_horizon,arima_order),
+        }
+        if use_sarima and n>=sp*2+4:
+            future_runners['SARIMA']=lambda:sarima_forecast(series[val_col],forecast_horizon,arima_order,sp)
+
+        future_idx=generate_future_index(series.index[-1],forecast_horizon,freq_str)
+        future_results={}
+        for name,fn in future_runners.items():
+            try:
+                result=fn(); pred=np.array(result[0],dtype=float)
+                ci=result[2]
+                if ci is None and name in test_results:
+                    rs=float(np.std(test_s.values-test_results[name]['pred']))
+                    ci=np.column_stack([pred-1.96*rs,pred+1.96*rs])
+                future_results[name]={'pred':pred,'index':future_idx,'ci':ci}
+            except: pass
+
+        residuals=np.array([])
+        if best_model and best_model in test_results:
+            residuals=test_s.values-test_results[best_model]['pred']
+
+        trust_total,trust_scores,trust_reasons=compute_trust_report(
+            n,missing_before,adf_result,metrics_df,best_model,forecast_horizon,sp,residuals)
+
+        story_text=generate_story(series,val_col,freq_label,sp,adf_result,decomp,
+                                   metrics_df,best_model,arima_order,trust_total,forecast_horizon)
+        model_reasons=generate_model_reason(best_model,metrics_df,decomp,sp,adf_result,arima_order)
+
+    # KPI
+    st.divider()
+    _,badge_cls,badge_text,trust_hex,_,kpi_trust_cls=trust_color_class(trust_total)
+    arima_case=detect_arima_case(arima_order)
+    kpi_data=[
+        ("kpi-card-blue","📊","데이터 수",str(n),freq_label),
+        ("kpi-card-violet","🔄","계절 주기",f"{sp} 스텝",f"감지 빈도: {freq_label}"),
+        ("kpi-card-orange","🏆","최적 모델",best_model or "N/A",f"RMSE {best_rmse:.1f}"),
+        ("kpi-card-orange","🔢","ARIMA 차수",str(arima_order),arima_case),
+        (kpi_trust_cls,"🛡️","신뢰 점수",f"{trust_total:.0f}/100",badge_text),
+    ]
+    cols=st.columns(5)
+    for col,(card_cls,icon,label,value,sub) in zip(cols,kpi_data):
+        with col:
+            val_color=trust_hex if label=="신뢰 점수" else "#0f172a"
+            st.markdown(f'<div class="kpi-card {card_cls}"><div class="kpi-icon">{icon}</div>'
+                        f'<div class="kpi-label">{label}</div>'
+                        f'<div class="kpi-value" style="color:{val_color};">{value}</div>'
+                        f'<div class="kpi-sub">{sub}</div></div>',unsafe_allow_html=True)
+    st.markdown("<div style='margin:0.8rem 0;'></div>",unsafe_allow_html=True)
+
+    tab1,tab2,tab3,tab4,tab5,tab6=st.tabs([
+        "📊 데이터 리포트","🔬 분해 & 진단",
+        "📈 예측 개요","🏆 모델 비교",
+        "🛡️ 신뢰 리포트","💾 다운로드",
+    ])
+
+    with tab1:
+        st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>자동 분석 요약</div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="story-box">{story_text}</div>',unsafe_allow_html=True)
+        c1,c2,c3=st.columns(3)
+        for col,clr,icon,title,txt in [
+            (c1,'green' if missing_before==0 else 'yellow','🔧','결측값 처리',f'발견 {missing_before}개 → 선형 보간'),
+            (c2,'green' if dup_count==0 else 'yellow','📋','중복 타임스탬프',f'{dup_count}개 → 평균 집계'),
+            (c3,'green','📅','날짜 범위',f'{series.index[0].date()} ~ {series.index[-1].date()}'),
+        ]:
+            with col:
+                st.markdown(f'<div class="card card-{clr}">{icon} <b>{title}</b><br><span style="color:#64748b;font-size:0.88rem;">{txt}</span></div>',unsafe_allow_html=True)
+        st.plotly_chart(plot_raw(series,val_col),use_container_width=True)
+        c1,c2=st.columns(2)
+        with c1:
+            st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>기술통계</div>',unsafe_allow_html=True)
+            st.dataframe(series[val_col].describe().to_frame("값").style.format("{:.3f}"),use_container_width=True)
+        with c2:
+            st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>ADF 정상성 검정</div>',unsafe_allow_html=True)
+            if np.isnan(adf_result['pvalue']):
+                st.warning("데이터 부족으로 ADF 검정 불가")
+            else:
+                clr='green' if adf_result['is_stationary'] else 'yellow'
+                msg="✅ 정상 시계열" if adf_result['is_stationary'] else "⚠️ 비정상 시계열"
+                st.markdown(f'<div class="card card-{clr}"><b>{msg}</b><br><span style="color:#64748b;font-size:0.88rem;">검정 통계량: {adf_result["statistic"]:.4f} | p-value: {adf_result["pvalue"]:.4f} | 임계값(5%): {adf_result["critical"].get("5%","N/A")}</span></div>',unsafe_allow_html=True)
+                st.info("p < 0.05 → 정상." if adf_result['is_stationary'] else f"p > 0.05 → 비정상. d={d_val} 차분 자동 적용.")
+        st.markdown(f'<div class="card card-violet">🔢 <b>ARIMA 추천 차수: {arima_order} → {arima_case}</b><br><span style="color:#64748b;font-size:0.85rem;">p={arima_order[0]}: AR차수 | d={arima_order[1]}: 차분횟수 | q={arima_order[2]}: MA차수</span></div>',unsafe_allow_html=True)
+        p,d,q=arima_order
+        cases=[
+            ("ARIMA(p,0,0)","AR(p)","과거 p개 값으로 예측. PACF가 p에서 절단.",p>0 and d==0 and q==0),
+            ("ARIMA(0,0,q)","MA(q)","과거 q개 오차로 예측. ACF가 q에서 절단.",p==0 and d==0 and q>0),
+            ("ARIMA(p,0,q)","ARMA(p,q)","AR+MA 결합.",p>0 and d==0 and q>0),
+            ("ARIMA(0,1,0)","랜덤워크","1차 차분만.",p==0 and d==1 and q==0),
+            ("ARIMA(p,d,q)","ARIMA","비정상 시계열에 차분 후 ARMA.",d>0 and (p>0 or q>0)),
+        ]
+        for notation,name,desc,is_active in cases:
+            cls="arima-case-active" if is_active else "arima-case"
+            prefix="⭐ " if is_active else ""
+            st.markdown(f'<div class="{cls}">{prefix}<b>{notation}</b> = <b>{name}</b> — {desc}</div>',unsafe_allow_html=True)
+        st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>데이터 미리보기</div>',unsafe_allow_html=True)
+        st.dataframe(series.head(20),use_container_width=True)
+
+    with tab2:
+        if decomp is not None:
+            st.plotly_chart(plot_decomp(decomp),use_container_width=True)
+            rv=float(np.var(decomp.resid.dropna())); tv=float(np.var(decomp.trend.dropna())); sv=float(np.var(decomp.seasonal.dropna()))
+            ts=max(0.0,1-rv/(tv+rv+1e-9)); ss=max(0.0,1-rv/(sv+rv+1e-9))
+            c1,c2,c3=st.columns(3)
+            with c1: st.metric("추세 강도",f"{ts:.1%}")
+            with c2: st.metric("계절성 강도",f"{ss:.1%}")
+            with c3: st.metric("계절 주기",f"{sp} 스텝")
+            if ss>0.4: st.success(f"계절성 강함 ({ss:.1%}) → SARIMA 또는 Holt-Winters 권장")
+            else: st.info("계절성 약함 → ARIMA 또는 Holt 모델이 적합할 수 있습니다.")
+        else:
+            st.warning(f"분해 불가: 데이터({n}개) < 계절주기({sp})×2")
+        st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>ACF / PACF</div>',unsafe_allow_html=True)
+        af=plot_acf_pacf(series[val_col])
+        if af: st.plotly_chart(af,use_container_width=True); st.caption("파란 막대=유의미한 자기상관 | ACF → MA차수(q) | PACF → AR차수(p)")
+        else: st.warning("데이터 부족으로 ACF/PACF 계산 불가")
+        if not adf_result['is_stationary'] and not np.isnan(adf_result['pvalue']):
+            st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>1차 차분 시계열</div>',unsafe_allow_html=True)
+            ds=series[val_col].diff().dropna(); da=run_adf(ds)
+            fig_d=go.Figure(); fig_d.add_trace(go.Scatter(x=ds.index,y=ds.values,mode='lines',line=dict(color='#f59e0b',width=1.8)))
+            fig_d.add_hline(y=0,line_dash='dash',line_color='#94a3b8',opacity=0.5)
+            styled_layout(fig_d,'1차 차분 시계열',260); st.plotly_chart(fig_d,use_container_width=True)
+            if da['is_stationary']: st.success(f"✅ 1차 차분 후 정상 (p={da['pvalue']:.4f})")
+            elif not np.isnan(da['pvalue']): st.warning(f"⚠️ 1차 차분 후에도 비정상 (p={da['pvalue']:.4f})")
+        if len(residuals)>=8:
+            st.markdown(f'<div class="sec-head"><div class="sec-head-dot"></div>잔차 진단 4종 — {best_model}</div>',unsafe_allow_html=True)
+            st.plotly_chart(plot_residuals_full(residuals,best_model),use_container_width=True)
+            lb_p=ljung_box_pval(residuals); jb_p=jarque_bera_pval(residuals)
+            dw_s=durbin_watson_stat(residuals); bp_p=breusch_pagan_pval(residuals)
+            c1,c2,c3,c4=st.columns(4)
+            for col,name,meaning,stat,is_p,rng,hint in [
+                (c1,"Ljung-Box","잔차 자기상관",lb_p,True,None,"p>0.05: 백색잡음"),
+                (c2,"Jarque-Bera","잔차 정규성",jb_p,True,None,"p>0.05: 정규분포"),
+                (c3,"Durbin-Watson","자기상관",dw_s,None,(1.5,2.5),"1.5~2.5: 이상없음"),
+                (c4,"Breusch-Pagan","등분산성",bp_p,True,None,"p>0.05: 등분산"),
+            ]:
+                with col:
+                    if stat is None or np.isnan(float(stat)): card_cls,sym,val_str="diag-card-na","❓","N/A"
+                    elif is_p:
+                        ok=float(stat)>0.05; card_cls="diag-card-pass" if ok else "diag-card-fail"; sym="✅" if ok else "❌"; val_str=f"p={stat:.3f}"
+                    else:
+                        ok=rng[0]<float(stat)<rng[1]; card_cls="diag-card-pass" if ok else "diag-card-warn"; sym="✅" if ok else "△"; val_str=f"{stat:.3f}"
+                    st.markdown(f'<div class="diag-card {card_cls}"><div class="diag-name">{name}</div><div class="diag-sym">{sym}</div><div class="diag-val">{val_str}</div><div class="diag-desc">{meaning}<br>{hint}</div></div>',unsafe_allow_html=True)
+
+    with tab3:
+        if forecast_horizon>n*0.5: st.warning(f"⚠️ 예측 {forecast_horizon}스텝 > 데이터({n})의 50%")
+        if forecast_horizon>sp*2: st.warning(f"⚠️ 예측 기간이 계절 주기({sp})의 2배 초과")
+        st.info(f"📅 1스텝=1{freq_label} | 예측 {forecast_horizon}스텝 | 최적: **{best_model}** | 음영=95% 신뢰구간")
+        if test_results:
+            st.plotly_chart(plot_forecast(series,val_col,test_results,future_results,best_model,train_end),use_container_width=True)
+        st.markdown(f'<div class="sec-head"><div class="sec-head-dot"></div>{best_model} 선택 이유</div>',unsafe_allow_html=True)
+        for sym,reason in model_reasons:
+            st.markdown(f'<div class="reason-card"><div class="reason-sym">{sym}</div><div>{reason}</div></div>',unsafe_allow_html=True)
+        if best_model and best_model in future_results:
+            st.markdown(f'<div class="sec-head"><div class="sec-head-dot"></div>미래 예측값 — {best_model}</div>',unsafe_allow_html=True)
+            fi=future_results[best_model]
+            df_ft=pd.DataFrame({'날짜':fi['index'],'예측값':np.round(fi['pred'],2)})
+            if fi.get('ci') is not None:
+                df_ft['하한(95%)']=np.round(fi['ci'][:,0],2); df_ft['상한(95%)']=np.round(fi['ci'][:,1],2)
+            st.dataframe(df_ft,use_container_width=True)
+
+    with tab4:
+        st.markdown('<div class="card card-violet">💡 <b>MASE &lt; 1</b> 이어야 Naive보다 의미 있는 예측입니다.</div>',unsafe_allow_html=True)
+        if not metrics_df.empty:
+            dc=[c for c in ['MAE','RMSE','MAPE','sMAPE','MASE','AIC','BIC'] if c in metrics_df.columns]
+            def highlight_best(s):
+                v=s.dropna()
+                if v.empty: return ['']*len(s)
+                mv=v.min()
+                return ['background-color:#d1fae5;font-weight:bold' if (not np.isnan(x) and x==mv) else '' for x in s]
+            st.dataframe(metrics_df[dc].style.apply(highlight_best,subset=[c for c in ['MAE','RMSE','MAPE','sMAPE','MASE'] if c in dc]).format("{:.4f}",na_rep="N/A"),use_container_width=True)
+            c1,c2=st.columns(2)
+            with c1: st.plotly_chart(plot_model_comparison(metrics_df,'RMSE'),use_container_width=True)
+            with c2: st.plotly_chart(plot_model_comparison(metrics_df,'MASE'),use_container_width=True)
+            if 'Naive' in metrics_df.index:
+                st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>Naive 대비 개선율</div>',unsafe_allow_html=True)
+                nr=metrics_df.loc['Naive','RMSE']
+                rows=[]
+                for m in metrics_df.index:
+                    if m=='Naive': continue
+                    r=metrics_df.loc[m,'RMSE']; imp=(nr-r)/nr*100 if nr>0 and not np.isnan(r) else 0.0
+                    rows.append({'모델':m,'RMSE':r,'Naive 대비 개선(%)':imp,'판정':'✅ 개선' if imp>0 else '❌ Naive보다 나쁨'})
+                if rows: st.dataframe(pd.DataFrame(rows).set_index('모델').style.format({'RMSE':'{:.4f}','Naive 대비 개선(%)':'{:.2f}'}),use_container_width=True)
+            st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>이 데이터 기준 지표 해석</div>',unsafe_allow_html=True)
+            if best_model and best_model in metrics_df.index:
+                m=metrics_df.loc[best_model]
+                c1,c2=st.columns(2)
+                for i,(clr,name,txt) in enumerate([
+                    ('blue','MAE',f"평균 오차: <b>{m['MAE']:.2f}</b>"),
+                    ('slate','RMSE',f"큰 오차 민감: <b>{m['RMSE']:.2f}</b>"),
+                    ('green' if m['MASE']<1 else 'yellow','MASE',f"{'Naive보다 <b>정확</b> ✅' if m['MASE']<1 else 'Naive보다 <b>부정확</b> ⚠️'} (MASE={m['MASE']:.3f})"),
+                    ('blue','MAPE',f"상대 오차: <b>{m['MAPE']:.1f}%</b>"),
+                ]):
+                    with (c1 if i%2==0 else c2):
+                        st.markdown(f'<div class="card card-{clr}"><b>{name}</b>: {txt}</div>',unsafe_allow_html=True)
+
+    with tab5:
+        tc,tl=trust_color_class(trust_total)[:2]; trust_hex2=trust_color_class(trust_total)[3]; badge_text2=trust_color_class(trust_total)[2]
+        c1,c2=st.columns([1,1.6])
+        with c1:
+            st.plotly_chart(plot_trust_gauge(trust_total),use_container_width=True)
+            st.markdown(f'<div style="text-align:center;margin-top:-1rem;"><span class="trust-badge {tc}">{badge_text2}</span><div class="trust-meta">최적 모델: <b>{best_model}</b><br>예측 기간: <b>{forecast_horizon}스텝</b></div></div>',unsafe_allow_html=True)
+        with c2:
+            st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>세부 평가</div>',unsafe_allow_html=True)
+            for item,score in trust_scores.items():
+                reason=trust_reasons.get(item,'')
+                sc='green' if score>=75 else ('yellow' if score>=55 else 'red')
+                bc='#10b981' if score>=75 else ('#f59e0b' if score>=55 else '#ef4444')
+                st.markdown(f'<div class="trust-item trust-item-{sc}"><div class="trust-item-header"><span class="trust-item-name">{item}</span><span class="trust-item-score" style="color:{bc};">{score:.0f}점</span></div><div class="trust-item-reason">{reason}</div><div class="trust-bar-bg"><div class="trust-bar-fill" style="width:{min(score,100):.0f}%;background:{bc};"></div></div></div>',unsafe_allow_html=True)
+        st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>자동 해석</div>',unsafe_allow_html=True)
+        lb_p=ljung_box_pval(residuals); jb_p=jarque_bera_pval(residuals); dw_s=durbin_watson_stat(residuals)
+        interps=[]
+        if trust_total>=75: interps.append(("green",f"✅ 이 예측은 신뢰할 수 있습니다. {best_model}이 주요 기준을 충족합니다."))
+        elif trust_total>=55: interps.append(("yellow","⚠️ 조건부로 참고할 수 있습니다."))
+        else: interps.append(("red","🔴 신뢰하기 어렵습니다. 데이터 보강 또는 모델 재검토가 필요합니다."))
+        if not adf_result['is_stationary'] and not np.isnan(adf_result['pvalue']): interps.append(("slate",f"📌 비정상 시계열 → d={d_val} 차분 적용됨"))
+        if best_model and best_model in metrics_df.index:
+            mv=metrics_df.loc[best_model,'MASE']
+            if not np.isnan(mv): interps.append(("green" if mv<1 else "yellow",f"📌 MASE={mv:.3f} → {'Naive보다 정확 ✅' if mv<1 else 'Naive보다 부정확 ⚠️'}"))
+        if not np.isnan(lb_p): interps.append(("green" if lb_p>0.05 else "red",f"📌 Ljung-Box p={lb_p:.3f} → {'백색잡음 ✅' if lb_p>0.05 else '패턴 남음 ⚠️'}"))
+        if not np.isnan(jb_p): interps.append(("green" if jb_p>0.05 else "yellow",f"📌 Jarque-Bera p={jb_p:.3f} → {'정규분포 ✅' if jb_p>0.05 else '비정규 △'}"))
+        c1,c2=st.columns(2)
+        for i,(clr,txt) in enumerate(interps):
+            with (c1 if i%2==0 else c2):
+                st.markdown(f'<div class="card card-{clr}">{txt}</div>',unsafe_allow_html=True)
+
+    with tab6:
+        st.markdown('<div class="sec-head"><div class="sec-head-dot"></div>결과 다운로드</div>',unsafe_allow_html=True)
+        c1,c2=st.columns(2)
+        with c1:
+            if best_model and best_model in future_results:
+                fi=future_results[best_model]
+                df_dl=pd.DataFrame({'date':fi['index'],f'forecast_{best_model}':np.round(fi['pred'],4)})
+                if fi.get('ci') is not None:
+                    df_dl['lower_95']=np.round(fi['ci'][:,0],4); df_dl['upper_95']=np.round(fi['ci'][:,1],4)
+                for nm,info in future_results.items():
+                    if nm!=best_model: df_dl[f'forecast_{nm}']=np.round(info['pred'],4)
+                st.download_button("📥 미래 예측값 CSV (신뢰구간 포함)",data=df_dl.to_csv(index=False).encode('utf-8-sig'),file_name=f"forecast_{best_model}_{forecast_horizon}steps.csv",mime='text/csv',use_container_width=True)
+            if not metrics_df.empty:
+                st.download_button("📥 모델 비교 CSV",data=metrics_df.round(4).to_csv().encode('utf-8-sig'),file_name="model_comparison.csv",mime='text/csv',use_container_width=True)
+        with c2:
+            st.download_button("📥 전처리된 데이터 CSV",data=series.reset_index().to_csv(index=False).encode('utf-8-sig'),file_name="cleaned_timeseries.csv",mime='text/csv',use_container_width=True)
+            lb_p2=ljung_box_pval(residuals); jb_p2=jarque_bera_pval(residuals)
+            dw_s2=durbin_watson_stat(residuals); bp_p2=breusch_pagan_pval(residuals)
+            report=[f"신뢰 점수: {trust_total:.1f}/100 ({badge_text})",f"최적 모델: {best_model}",f"ARIMA 차수: {arima_order} ({arima_case})",f"예측 기간: {forecast_horizon}스텝 ({freq_label})","",
+                    "[ 세부 평가 ]"]+[f"  {item}: {score:.0f}점 — {trust_reasons.get(item,'')}" for item,score in trust_scores.items()]+[
+                    "","[ 잔차 진단 ]",f"  Ljung-Box p={lb_p2:.4f}",f"  Jarque-Bera p={jb_p2:.4f}",f"  Durbin-Watson={dw_s2:.4f}",f"  Breusch-Pagan p={bp_p2:.4f}"]
+            st.download_button("📥 신뢰 리포트 TXT",data="\n".join(report).encode('utf-8'),file_name="trust_report.txt",mime='text/plain',use_container_width=True)
+
+    st.divider()
+    st.caption("📈 TimeSeries Trust Analyzer · 자동 분석 · 다중 모델 예측 · 신뢰도 채점")
+
+
+if __name__ == "__main__":
+    main()
