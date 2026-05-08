@@ -864,226 +864,159 @@ def main():
         val_col=numeric_cols[0]
     else:
         # ══════════════════════════════════════════════════════════
-        # 히어로 랜딩 페이지
+        # 히어로 랜딩 페이지 (간결 버전)
         # ══════════════════════════════════════════════════════════
 
-        # 히어로 배너
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #312e81 70%, #4c1d95 100%);
-            border-radius: 20px; padding: 3rem 2.5rem 2.5rem 2.5rem;
-            margin-bottom: 1.5rem; position: relative; overflow: hidden;
-        ">
-            <!-- 배경 장식 원 -->
-            <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;
-                        background:rgba(139,92,246,0.15);border-radius:50%;"></div>
-            <div style="position:absolute;bottom:-40px;left:20%;width:150px;height:150px;
-                        background:rgba(99,102,241,0.1);border-radius:50%;"></div>
+        # ① 히어로 배너 (작게 나눠서 안전하게 렌더링)
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#4c1d95 100%);'
+            'border-radius:20px;padding:2.5rem 2.5rem 2rem;margin-bottom:1.5rem;">'
+            '<div style="display:inline-block;background:rgba(139,92,246,0.3);'
+            'border:1px solid rgba(167,139,250,0.4);border-radius:999px;'
+            'padding:3px 14px;font-size:0.75rem;color:#c4b5fd;'
+            'font-weight:600;letter-spacing:0.06em;margin-bottom:1rem;">✦ AI TIME SERIES ANALYSIS</div>'
+            '<h1 style="color:white;font-size:2.4rem;font-weight:900;'
+            'line-height:1.2;margin:0 0 0.8rem 0;letter-spacing:-1px;">'
+            '시계열 예측,<br>'
+            '<span style="color:#a78bfa;">신뢰도까지 판단합니다</span></h1>'
+            '<p style="color:#94a3b8;font-size:0.95rem;margin:0 0 1.5rem 0;line-height:1.6;">'
+            'CSV 파일 하나로 &nbsp;<strong style="color:#c4b5fd;">자동 분석</strong> →'
+            '&nbsp;<strong style="color:#c4b5fd;">7개 모델 예측</strong> →'
+            '&nbsp;<strong style="color:#c4b5fd;">신뢰 점수 채점</strong>까지</p>'
+            '<div style="display:flex;gap:0.8rem;flex-wrap:wrap;">'
+            '<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);'
+            'border-radius:10px;padding:0.6rem 1.1rem;text-align:center;">'
+            '<div style="color:white;font-size:1.3rem;font-weight:800;">7개</div>'
+            '<div style="color:#94a3b8;font-size:0.72rem;">예측 모델</div></div>'
+            '<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);'
+            'border-radius:10px;padding:0.6rem 1.1rem;text-align:center;">'
+            '<div style="color:white;font-size:1.3rem;font-weight:800;">5종</div>'
+            '<div style="color:#94a3b8;font-size:0.72rem;">신뢰 기준</div></div>'
+            '<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);'
+            'border-radius:10px;padding:0.6rem 1.1rem;text-align:center;">'
+            '<div style="color:white;font-size:1.3rem;font-weight:800;">4종</div>'
+            '<div style="color:#94a3b8;font-size:0.72rem;">잔차 진단</div></div>'
+            '<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);'
+            'border-radius:10px;padding:0.6rem 1.1rem;text-align:center;">'
+            '<div style="color:white;font-size:1.3rem;font-weight:800;">95%</div>'
+            '<div style="color:#94a3b8;font-size:0.72rem;">신뢰구간</div></div>'
+            '</div></div>',
+            unsafe_allow_html=True
+        )
 
-            <div style="position:relative;z-index:1;">
-                <div style="display:inline-block;background:rgba(139,92,246,0.3);
-                            border:1px solid rgba(167,139,250,0.4);border-radius:999px;
-                            padding:4px 16px;font-size:0.78rem;color:#c4b5fd;
-                            font-weight:600;letter-spacing:0.06em;margin-bottom:1rem;">
-                    ✦ AI-POWERED TIME SERIES ANALYSIS
-                </div>
-                <h1 style="color:white;font-size:2.6rem;font-weight:900;
-                           line-height:1.15;margin:0 0 0.8rem 0;letter-spacing:-1px;">
-                    시계열 예측,<br>
-                    <span style="background:linear-gradient(90deg,#a78bfa,#60a5fa);
-                                 -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
-                        신뢰도까지 판단합니다
-                    </span>
-                </h1>
-                <p style="color:#94a3b8;font-size:1rem;margin:0 0 1.8rem 0;
-                          max-width:520px;line-height:1.6;">
-                    CSV 파일을 올리면 자동으로 분석하고, 7개 모델로 예측하고,<br>
-                    "이 예측을 믿어도 되나?"를 <strong style="color:#c4b5fd;">0~100점</strong>으로 채점합니다.
-                </p>
-                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
-                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
-                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
-                        <div style="color:white;font-size:1.4rem;font-weight:800;">7개</div>
-                        <div style="color:#94a3b8;font-size:0.75rem;">예측 모델</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
-                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
-                        <div style="color:white;font-size:1.4rem;font-weight:800;">5종</div>
-                        <div style="color:#94a3b8;font-size:0.75rem;">신뢰 기준</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
-                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
-                        <div style="color:white;font-size:1.4rem;font-weight:800;">4종</div>
-                        <div style="color:#94a3b8;font-size:0.75rem;">잔차 진단</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
-                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
-                        <div style="color:white;font-size:1.4rem;font-weight:800;">95%</div>
-                        <div style="color:#94a3b8;font-size:0.75rem;">신뢰구간</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # 데모 차트 + 설명
-        demo_df = get_airpassengers()
-        demo_s, _, _ = load_and_validate(demo_df, 'Month', 'Passengers')
-        demo_sp = 12
-
-        # 데모 예측 (HoltWinters)
+        # ② 데모 차트 생성
         import warnings as _w; _w.filterwarnings('ignore')
-        demo_train = demo_s['Passengers'].iloc[:132]
-        demo_test  = demo_s['Passengers'].iloc[132:]
-        demo_future_idx = generate_future_index(demo_s.index[-1], 24, 'MS')
+        _demo_df = get_airpassengers()
+        _demo_s, _, _ = load_and_validate(_demo_df, 'Month', 'Passengers')
+        _demo_future_idx = generate_future_index(_demo_s.index[-1], 24, 'MS')
+        _demo_decomp = get_decomposition(_demo_s['Passengers'], 12)
         try:
-            demo_pred_f, demo_fit = holtwinters_forecast(demo_s['Passengers'], 24, demo_sp)
-            demo_pred_t, _, demo_ci = arima_forecast(demo_train, 12, (1,1,1))
-        except:
-            demo_pred_f = np.array([demo_s['Passengers'].iloc[-1]]*24)
-            demo_ci = None
+            _demo_pred, _ = holtwinters_forecast(_demo_s['Passengers'], 24, 12)
+        except Exception:
+            _demo_pred = np.full(24, float(_demo_s['Passengers'].iloc[-1]))
 
-        # 분해
-        demo_decomp = get_decomposition(demo_s['Passengers'], demo_sp)
+        _ci_upper = _demo_pred * 1.12
+        _ci_lower = _demo_pred * 0.88
+        _il = list(_demo_future_idx)
 
-        col_chart, col_info = st.columns([2.2, 1])
-
-        with col_chart:
-            st.markdown('<p style="color:#64748b;font-size:0.82rem;font-weight:600;'
-                        'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.4rem;">'
-                        '📊 DEMO — AirPassengers 월별 항공 승객 (1949~1962)</p>',
-                        unsafe_allow_html=True)
-            fig_demo = go.Figure()
-
-            # 추세선 (분해 결과)
-            if demo_decomp is not None:
-                fig_demo.add_trace(go.Scatter(
-                    x=demo_decomp.trend.index, y=demo_decomp.trend.values,
-                    mode='lines', name='추세 (Trend)',
-                    line=dict(color='#f59e0b', width=2, dash='dot'),
-                    opacity=0.7
-                ))
-
-            # 실제 데이터
-            fig_demo.add_trace(go.Scatter(
-                x=demo_s.index, y=demo_s['Passengers'],
-                mode='lines', name='실제 데이터',
-                line=dict(color='#6366f1', width=2),
-                fill='tozeroy', fillcolor='rgba(99,102,241,0.06)'
+        _fig_demo = go.Figure()
+        if _demo_decomp is not None:
+            _fig_demo.add_trace(go.Scatter(
+                x=_demo_decomp.trend.index, y=_demo_decomp.trend.values,
+                mode='lines', name='추세 (Trend)',
+                line=dict(color='#f59e0b', width=2, dash='dot'), opacity=0.8
             ))
+        _fig_demo.add_trace(go.Scatter(
+            x=_demo_s.index, y=_demo_s['Passengers'],
+            mode='lines', name='실제 데이터',
+            line=dict(color='#6366f1', width=2),
+            fill='tozeroy', fillcolor='rgba(99,102,241,0.07)'
+        ))
+        _fig_demo.add_trace(go.Scatter(
+            x=_il + _il[::-1],
+            y=list(_ci_upper) + list(_ci_lower)[::-1],
+            fill='toself', fillcolor='rgba(236,72,153,0.13)',
+            line=dict(color='rgba(0,0,0,0)'),
+            name='95% 신뢰구간', hoverinfo='skip', showlegend=True
+        ))
+        _fig_demo.add_trace(go.Scatter(
+            x=_demo_future_idx, y=_demo_pred,
+            mode='lines+markers', name='HoltWinters 예측 (24개월)',
+            line=dict(color='#ec4899', width=2.5, dash='dash'),
+            marker=dict(size=4)
+        ))
+        _fig_demo.add_vline(
+            x=int(_demo_s.index[-1].timestamp() * 1000),
+            line_dash='dash', line_color='#94a3b8', opacity=0.6,
+            annotation_text='현재 → 예측', annotation_position='top right'
+        )
+        _fig_demo.update_layout(
+            height=340, plot_bgcolor='white', paper_bgcolor='white',
+            margin=dict(l=50, r=20, t=10, b=40),
+            xaxis=dict(showgrid=True, gridcolor='#f1f5f9',
+                       tickfont=dict(size=11, color='#94a3b8')),
+            yaxis=dict(showgrid=True, gridcolor='#f1f5f9',
+                       tickfont=dict(size=11, color='#94a3b8'),
+                       title=dict(text='승객 수 (천 명)', font=dict(size=11, color='#94a3b8'))),
+            legend=dict(orientation='h', y=1.06, x=0,
+                        bgcolor='rgba(0,0,0,0)', font=dict(size=11, color='#64748b')),
+            font=dict(family='Inter'),
+        )
 
-            # 미래 예측
-            ci_upper = demo_pred_f * 1.12
-            ci_lower = demo_pred_f * 0.88
-            idx_list = list(demo_future_idx)
-            fig_demo.add_trace(go.Scatter(
-                x=idx_list + idx_list[::-1],
-                y=list(ci_upper) + list(ci_lower)[::-1],
-                fill='toself', fillcolor='rgba(236,72,153,0.12)',
-                line=dict(color='rgba(0,0,0,0)'),
-                name='95% 신뢰구간', hoverinfo='skip', showlegend=True
-            ))
-            fig_demo.add_trace(go.Scatter(
-                x=demo_future_idx, y=demo_pred_f,
-                mode='lines+markers', name='예측 (HoltWinters)',
-                line=dict(color='#ec4899', width=2.5, dash='dash'),
-                marker=dict(size=4)
-            ))
-
-            fig_demo.add_vline(
-                x=int(demo_s.index[-1].timestamp()*1000),
-                line_dash='dash', line_color='#94a3b8', opacity=0.6,
-                annotation_text='현재 → 예측', annotation_position='top right'
+        # ③ 차트 + 오른쪽 스탯 카드
+        _c1, _c2 = st.columns([2.3, 1])
+        with _c1:
+            st.markdown(
+                '<p style="color:#64748b;font-size:0.78rem;font-weight:700;'
+                'text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.3rem;">'
+                '📊 DEMO PREVIEW — AirPassengers 월별 항공 승객 (1949~1962)</p>',
+                unsafe_allow_html=True
             )
-            fig_demo.update_layout(
-                height=340, plot_bgcolor='white', paper_bgcolor='white',
-                margin=dict(l=40, r=20, t=20, b=40),
-                xaxis=dict(showgrid=True, gridcolor='#f1f5f9',
-                           tickfont=dict(size=11, color='#94a3b8')),
-                yaxis=dict(showgrid=True, gridcolor='#f1f5f9',
-                           tickfont=dict(size=11, color='#94a3b8')),
-                legend=dict(orientation='h', y=1.08, x=0,
-                            bgcolor='rgba(0,0,0,0)',
-                            font=dict(size=11, color='#64748b')),
-                font=dict(family='Inter'),
-            )
-            st.plotly_chart(fig_demo, use_container_width=True)
+            st.plotly_chart(_fig_demo, use_container_width=True)
 
-        with col_info:
-            st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+        with _c2:
+            st.markdown('<div style="height:1.8rem;"></div>', unsafe_allow_html=True)
+            for _color, _icon, _label, _val, _sub in [
+                ('#6366f1','📅','데이터 기간','1949–1960','144개월'),
+                ('#f59e0b','📈','전체 추세','상승 +107%','후반부 대비'),
+                ('#10b981','🔄','계절 주기','12개월','강도 77%'),
+                ('#ec4899','🏆','최적 모델','HoltWinters','MASE 0.985'),
+            ]:
+                st.markdown(
+                    f'<div style="background:white;border-radius:10px;padding:0.7rem 1rem;'
+                    f'margin-bottom:0.5rem;border-left:3px solid {_color};'
+                    f'box-shadow:0 1px 4px rgba(0,0,0,0.05);">'
+                    f'<div style="font-size:0.68rem;color:#94a3b8;font-weight:700;'
+                    f'text-transform:uppercase;letter-spacing:0.04em;">{_icon} {_label}</div>'
+                    f'<div style="font-size:1rem;font-weight:800;color:#1e293b;">{_val}</div>'
+                    f'<div style="font-size:0.75rem;color:#94a3b8;">{_sub}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
 
-            # 데모 지표 카드들
-            demo_stats = [
-                ("#6366f1", "📅", "데이터 기간", "1949 ~ 1960", "144개월"),
-                ("#f59e0b", "📈", "추세", "상승", "+106.5%"),
-                ("#10b981", "🔄", "계절 주기", "12개월", "강도 77%"),
-                ("#ec4899", "🏆", "최적 모델", "HoltWinters", "MASE 0.985"),
-            ]
-            for color, icon, label, value, sub in demo_stats:
-                st.markdown(f"""
-                <div style="background:white;border-radius:10px;padding:0.75rem 1rem;
-                            margin-bottom:0.5rem;border-left:3px solid {color};
-                            border:1px solid #f1f5f9;
-                            box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.1rem;">
-                        <span>{icon}</span>
-                        <span style="font-size:0.72rem;color:#94a3b8;font-weight:600;
-                                     text-transform:uppercase;letter-spacing:0.04em;">{label}</span>
-                    </div>
-                    <div style="font-size:1rem;font-weight:800;color:#1e293b;">{value}</div>
-                    <div style="font-size:0.78rem;color:#94a3b8;">{sub}</div>
-                </div>""", unsafe_allow_html=True)
-
-        # 사용 방법 3단계
-        st.markdown("<div style='margin-top:1.5rem;'></div>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
-            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
-                        padding:1.2rem;border:1px solid #e2e8f0;
-                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
-                <div style="width:36px;height:36px;background:#ede9fe;border-radius:50%;
-                            display:flex;align-items:center;justify-content:center;
-                            margin:0 auto 0.7rem;font-size:1.1rem;">1</div>
-                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">CSV 업로드</div>
-                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
-                    날짜 + 숫자 컬럼이 있는<br>단변량 시계열이면 OK
-                </div>
-            </div>
-            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
-                        padding:1.2rem;border:1px solid #e2e8f0;
-                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
-                <div style="width:36px;height:36px;background:#dbeafe;border-radius:50%;
-                            display:flex;align-items:center;justify-content:center;
-                            margin:0 auto 0.7rem;font-size:1.1rem;">2</div>
-                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">자동 분석</div>
-                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
-                    ADF·분해·ACF/PACF·ARIMA<br>차수까지 전부 자동
-                </div>
-            </div>
-            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
-                        padding:1.2rem;border:1px solid #e2e8f0;
-                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
-                <div style="width:36px;height:36px;background:#fef3c7;border-radius:50%;
-                            display:flex;align-items:center;justify-content:center;
-                            margin:0 auto 0.7rem;font-size:1.1rem;">3</div>
-                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">예측 + 신뢰도</div>
-                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
-                    7개 모델 비교 후 최적 선택,<br>신뢰 점수 0~100점 제공
-                </div>
-            </div>
-            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
-                        padding:1.2rem;border:1px solid #e2e8f0;
-                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
-                <div style="width:36px;height:36px;background:#d1fae5;border-radius:50%;
-                            display:flex;align-items:center;justify-content:center;
-                            margin:0 auto 0.7rem;font-size:1.1rem;">4</div>
-                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">다운로드</div>
-                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
-                    예측값 CSV + 신뢰 리포트<br>TXT로 저장
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # ④ 3단계 사용법
+        st.markdown('<div style="margin-top:1rem;"></div>', unsafe_allow_html=True)
+        _steps = [
+            ('#ede9fe','1','CSV 업로드','날짜+숫자 컬럼 있는 단변량 시계열이면 OK'),
+            ('#dbeafe','2','자동 분석','ADF·분해·ACF/PACF·ARIMA 차수 전부 자동'),
+            ('#fef3c7','3','예측 + 신뢰도','7개 모델 비교 후 최적 선택, 신뢰 점수 제공'),
+            ('#d1fae5','4','결과 다운로드','예측값 CSV + 신뢰 리포트 TXT 저장'),
+        ]
+        _sc1, _sc2, _sc3, _sc4 = st.columns(4)
+        for _col, (_bg, _num, _title, _desc) in zip([_sc1,_sc2,_sc3,_sc4], _steps):
+            with _col:
+                st.markdown(
+                    f'<div style="background:white;border-radius:14px;padding:1.1rem;'
+                    f'border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04);'
+                    f'text-align:center;height:100%;">'
+                    f'<div style="width:34px;height:34px;background:{_bg};border-radius:50%;'
+                    f'display:flex;align-items:center;justify-content:center;'
+                    f'margin:0 auto 0.6rem;font-size:0.9rem;font-weight:700;color:#374151;">{_num}</div>'
+                    f'<div style="font-weight:700;color:#1e293b;font-size:0.9rem;margin-bottom:0.3rem;">{_title}</div>'
+                    f'<div style="font-size:0.78rem;color:#94a3b8;line-height:1.5;">{_desc}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
 
         return
 
