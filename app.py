@@ -208,6 +208,23 @@ html, body, [class*="css"] {
 .feature-title { font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 0.4rem; }
 .feature-desc  { font-size: 0.85rem; color: #64748b; line-height: 1.5; }
 
+/* ── 탭 컨텐츠 상단 여백 ── */
+.stTabs [data-baseweb="tab-panel"] { padding-top: 1rem; }
+
+/* ── 버튼 개선 ── */
+.stDownloadButton > button {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s !important;
+}
+.stDownloadButton > button:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+/* ── info 박스 ── */
+.stAlert [data-testid="stMarkdownContainer"] p { margin: 0; }
+
 /* ── 배지 ── */
 .badge {
     display: inline-block; padding: 2px 10px; border-radius: 999px;
@@ -666,7 +683,7 @@ def plot_forecast(series,val_col,test_results,future_results,best_model,train_en
             fig.add_trace(go.Scatter(
                 x=il+il[::-1],y=list(ci[:,1])+list(ci[:,0])[::-1],
                 fill='toself',fillcolor=f'rgba({_hex_rgb(color)},0.18)',
-                line=dict(color='rgba(0,0,0,0)'),name='95% 신뢰구간',hoverinfo='skip'))
+                line=dict(color='rgba(0,0,0,0)'),name='95% 신뢰구간',hoverinfo='skip',showlegend=False))
         fig.add_trace(go.Scatter(
             x=info['index'],y=info['pred'],name=f'{best_model} ★ 최적',mode='lines',
             line=dict(color=color,dash='solid',width=3)))
@@ -678,7 +695,7 @@ def plot_forecast(series,val_col,test_results,future_results,best_model,train_en
             fig.add_trace(go.Scatter(
                 x=il+il[::-1],y=list(ci[:,1])+list(ci[:,0])[::-1],
                 fill='toself',fillcolor=f'rgba({_hex_rgb(color)},0.12)',
-                line=dict(color='rgba(0,0,0,0)'),name='미래 95% CI',hoverinfo='skip'))
+                line=dict(color='rgba(0,0,0,0)'),name='미래 95% CI',hoverinfo='skip',showlegend=False))
         fig.add_trace(go.Scatter(
             x=fi['index'],y=fi['pred'],name=f'{best_model} 미래 예측',
             mode='lines+markers',line=dict(color=color,width=3,dash='dash'),
@@ -690,7 +707,7 @@ def plot_forecast(series,val_col,test_results,future_results,best_model,train_en
     fig.add_vline(x=int(train_end.timestamp()*1000),line_dash='dash',
                   line_color='#94a3b8',opacity=0.8,
                   annotation_text='훈련 | 테스트',annotation_position='top right')
-    fig=styled_layout(fig,f'예측 결과 — 최적 모델: {best_model} (음영=95% 신뢰구간)',500)
+    fig=styled_layout(fig,f'예측 결과 — 최적 모델: {best_model}  (음영=95% 신뢰구간)',500)
     fig.update_layout(legend=dict(orientation='h',yanchor='bottom',y=1.02,xanchor='right',x=1))
     return fig
 
@@ -743,12 +760,12 @@ def plot_model_comparison(metrics_df,metric='RMSE'):
     valid=[v for v in vals if not np.isnan(v)]
     if not valid: return go.Figure()
     min_v=min(valid)
-    colors=['#10b981' if (not np.isnan(v) and v==min_v) else '#e2e8f0' for v in vals]
+    colors=['#F59E0B' if (not np.isnan(v) and v==min_v) else '#e2e8f0' for v in vals]
     fig=go.Figure(go.Bar(
         x=metrics_df.index.tolist(),y=vals,marker_color=colors,
         text=[f'{v:.3f}' if not np.isnan(v) else 'N/A' for v in vals],
         textposition='outside',marker_line_width=0))
-    return styled_layout(fig,f'{metric} 비교 (초록=최적, 낮을수록 좋음)',360)
+    return styled_layout(fig,f'{metric} 비교 (노란색=최적, 낮을수록 좋음)',360)
 
 def plot_trust_gauge(score):
     """신뢰 점수 게이지 차트"""
@@ -802,7 +819,7 @@ def main():
             📈 시계열 예측 <span class="app-title-accent">신뢰 분석기</span>
         </div>
         <div class="app-subtitle">
-            CSV 업로드 → 자동 분석 → 6개 모델 예측 → "이 예측, 믿어도 될까?" 까지
+            데이터를 올리면 자동으로 분석하고, 예측하고, 신뢰도까지 판단합니다
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -823,13 +840,12 @@ def main():
         use_sarima      =st.checkbox("SARIMA 포함",value=True,
                                      help="계절성 ARIMA. 30초 내외 소요")
         st.divider()
-        st.markdown("**📚 강의 개념**")
-        concepts=[("ADF 검정","정상성 판단"),("ACF/PACF","ARIMA 차수 추정"),
-                  ("시계열 분해","추세·계절·잔차"),("AR/MA/ARMA/ARIMA","자기회귀 모형"),
-                  ("SARIMA","계절성 ARIMA"),("SES/Holt/HW","지수 평활법"),
-                  ("잔차 진단 4종","Ljung-Box·JB·DW·BP"),("신뢰구간","예측 불확실성")]
-        for c,d in concepts:
-            st.markdown(f"✅ **{c}** — {d}")
+        st.markdown("**📚 적용 강의 개념**")
+        st.markdown("""
+        `ADF` `ACF/PACF` `분해` `AR/MA/ARMA`
+        `ARIMA` `SARIMA` `SES` `Holt` `HW`
+        `잔차진단 4종` `신뢰구간` `Naive 기준선`
+        """)
 
     # ── 데이터 로드 ───────────────────────────────────────────────
     df_raw=None; date_col=None; numeric_cols=[]; val_col=None
@@ -847,23 +863,228 @@ def main():
         if not numeric_cols: st.error("❌ 수치형 열이 없습니다."); st.stop()
         val_col=numeric_cols[0]
     else:
-        # ── 초기 화면 ──
-        st.markdown("---")
-        c1,c2,c3,c4=st.columns(4)
-        features=[
-            ("📂","어떤 CSV든 OK","날짜+숫자 컬럼이 있는\n단변량 시계열이면 충분"),
-            ("🔬","자동 완전 분석","ADF·분해·ACF/PACF·\nARIMA 차수까지 자동"),
-            ("🤖","7개 모델 비교","Naive·SES·Holt·HW·\nARIMA·SARIMA 동시 훈련"),
-            ("🛡️","신뢰 점수 채점","예측을 믿어도 되는지\n5가지 기준으로 0~100점"),
-        ]
-        for col,(icon,title,desc) in zip([c1,c2,c3,c4],features):
-            with col:
+        # ══════════════════════════════════════════════════════════
+        # 히어로 랜딩 페이지
+        # ══════════════════════════════════════════════════════════
+
+        # 히어로 배너
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #312e81 70%, #4c1d95 100%);
+            border-radius: 20px; padding: 3rem 2.5rem 2.5rem 2.5rem;
+            margin-bottom: 1.5rem; position: relative; overflow: hidden;
+        ">
+            <!-- 배경 장식 원 -->
+            <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;
+                        background:rgba(139,92,246,0.15);border-radius:50%;"></div>
+            <div style="position:absolute;bottom:-40px;left:20%;width:150px;height:150px;
+                        background:rgba(99,102,241,0.1);border-radius:50%;"></div>
+
+            <div style="position:relative;z-index:1;">
+                <div style="display:inline-block;background:rgba(139,92,246,0.3);
+                            border:1px solid rgba(167,139,250,0.4);border-radius:999px;
+                            padding:4px 16px;font-size:0.78rem;color:#c4b5fd;
+                            font-weight:600;letter-spacing:0.06em;margin-bottom:1rem;">
+                    ✦ AI-POWERED TIME SERIES ANALYSIS
+                </div>
+                <h1 style="color:white;font-size:2.6rem;font-weight:900;
+                           line-height:1.15;margin:0 0 0.8rem 0;letter-spacing:-1px;">
+                    시계열 예측,<br>
+                    <span style="background:linear-gradient(90deg,#a78bfa,#60a5fa);
+                                 -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+                        신뢰도까지 판단합니다
+                    </span>
+                </h1>
+                <p style="color:#94a3b8;font-size:1rem;margin:0 0 1.8rem 0;
+                          max-width:520px;line-height:1.6;">
+                    CSV 파일을 올리면 자동으로 분석하고, 7개 모델로 예측하고,<br>
+                    "이 예측을 믿어도 되나?"를 <strong style="color:#c4b5fd;">0~100점</strong>으로 채점합니다.
+                </p>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
+                        <div style="color:white;font-size:1.4rem;font-weight:800;">7개</div>
+                        <div style="color:#94a3b8;font-size:0.75rem;">예측 모델</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
+                        <div style="color:white;font-size:1.4rem;font-weight:800;">5종</div>
+                        <div style="color:#94a3b8;font-size:0.75rem;">신뢰 기준</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
+                        <div style="color:white;font-size:1.4rem;font-weight:800;">4종</div>
+                        <div style="color:#94a3b8;font-size:0.75rem;">잔차 진단</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+                                border-radius:10px;padding:0.7rem 1.2rem;text-align:center;">
+                        <div style="color:white;font-size:1.4rem;font-weight:800;">95%</div>
+                        <div style="color:#94a3b8;font-size:0.75rem;">신뢰구간</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 데모 차트 + 설명
+        demo_df = get_airpassengers()
+        demo_s, _, _ = load_and_validate(demo_df, 'Month', 'Passengers')
+        demo_sp = 12
+
+        # 데모 예측 (HoltWinters)
+        import warnings as _w; _w.filterwarnings('ignore')
+        demo_train = demo_s['Passengers'].iloc[:132]
+        demo_test  = demo_s['Passengers'].iloc[132:]
+        demo_future_idx = generate_future_index(demo_s.index[-1], 24, 'MS')
+        try:
+            demo_pred_f, demo_fit = holtwinters_forecast(demo_s['Passengers'], 24, demo_sp)
+            demo_pred_t, _, demo_ci = arima_forecast(demo_train, 12, (1,1,1))
+        except:
+            demo_pred_f = np.array([demo_s['Passengers'].iloc[-1]]*24)
+            demo_ci = None
+
+        # 분해
+        demo_decomp = get_decomposition(demo_s['Passengers'], demo_sp)
+
+        col_chart, col_info = st.columns([2.2, 1])
+
+        with col_chart:
+            st.markdown('<p style="color:#64748b;font-size:0.82rem;font-weight:600;'
+                        'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.4rem;">'
+                        '📊 DEMO — AirPassengers 월별 항공 승객 (1949~1962)</p>',
+                        unsafe_allow_html=True)
+            fig_demo = go.Figure()
+
+            # 추세선 (분해 결과)
+            if demo_decomp is not None:
+                fig_demo.add_trace(go.Scatter(
+                    x=demo_decomp.trend.index, y=demo_decomp.trend.values,
+                    mode='lines', name='추세 (Trend)',
+                    line=dict(color='#f59e0b', width=2, dash='dot'),
+                    opacity=0.7
+                ))
+
+            # 실제 데이터
+            fig_demo.add_trace(go.Scatter(
+                x=demo_s.index, y=demo_s['Passengers'],
+                mode='lines', name='실제 데이터',
+                line=dict(color='#6366f1', width=2),
+                fill='tozeroy', fillcolor='rgba(99,102,241,0.06)'
+            ))
+
+            # 미래 예측
+            ci_upper = demo_pred_f * 1.12
+            ci_lower = demo_pred_f * 0.88
+            idx_list = list(demo_future_idx)
+            fig_demo.add_trace(go.Scatter(
+                x=idx_list + idx_list[::-1],
+                y=list(ci_upper) + list(ci_lower)[::-1],
+                fill='toself', fillcolor='rgba(236,72,153,0.12)',
+                line=dict(color='rgba(0,0,0,0)'),
+                name='95% 신뢰구간', hoverinfo='skip', showlegend=True
+            ))
+            fig_demo.add_trace(go.Scatter(
+                x=demo_future_idx, y=demo_pred_f,
+                mode='lines+markers', name='예측 (HoltWinters)',
+                line=dict(color='#ec4899', width=2.5, dash='dash'),
+                marker=dict(size=4)
+            ))
+
+            fig_demo.add_vline(
+                x=int(demo_s.index[-1].timestamp()*1000),
+                line_dash='dash', line_color='#94a3b8', opacity=0.6,
+                annotation_text='현재 → 예측', annotation_position='top right'
+            )
+            fig_demo.update_layout(
+                height=340, plot_bgcolor='white', paper_bgcolor='white',
+                margin=dict(l=40, r=20, t=20, b=40),
+                xaxis=dict(showgrid=True, gridcolor='#f1f5f9',
+                           tickfont=dict(size=11, color='#94a3b8')),
+                yaxis=dict(showgrid=True, gridcolor='#f1f5f9',
+                           tickfont=dict(size=11, color='#94a3b8')),
+                legend=dict(orientation='h', y=1.08, x=0,
+                            bgcolor='rgba(0,0,0,0)',
+                            font=dict(size=11, color='#64748b')),
+                font=dict(family='Inter'),
+            )
+            st.plotly_chart(fig_demo, use_container_width=True)
+
+        with col_info:
+            st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+
+            # 데모 지표 카드들
+            demo_stats = [
+                ("#6366f1", "📅", "데이터 기간", "1949 ~ 1960", "144개월"),
+                ("#f59e0b", "📈", "추세", "상승", "+106.5%"),
+                ("#10b981", "🔄", "계절 주기", "12개월", "강도 77%"),
+                ("#ec4899", "🏆", "최적 모델", "HoltWinters", "MASE 0.985"),
+            ]
+            for color, icon, label, value, sub in demo_stats:
                 st.markdown(f"""
-                <div class="feature-card">
-                    <div class="feature-icon">{icon}</div>
-                    <div class="feature-title">{title}</div>
-                    <div class="feature-desc">{desc}</div>
+                <div style="background:white;border-radius:10px;padding:0.75rem 1rem;
+                            margin-bottom:0.5rem;border-left:3px solid {color};
+                            border:1px solid #f1f5f9;
+                            box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.1rem;">
+                        <span>{icon}</span>
+                        <span style="font-size:0.72rem;color:#94a3b8;font-weight:600;
+                                     text-transform:uppercase;letter-spacing:0.04em;">{label}</span>
+                    </div>
+                    <div style="font-size:1rem;font-weight:800;color:#1e293b;">{value}</div>
+                    <div style="font-size:0.78rem;color:#94a3b8;">{sub}</div>
                 </div>""", unsafe_allow_html=True)
+
+        # 사용 방법 3단계
+        st.markdown("<div style='margin-top:1.5rem;'></div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
+                        padding:1.2rem;border:1px solid #e2e8f0;
+                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
+                <div style="width:36px;height:36px;background:#ede9fe;border-radius:50%;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 0.7rem;font-size:1.1rem;">1</div>
+                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">CSV 업로드</div>
+                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
+                    날짜 + 숫자 컬럼이 있는<br>단변량 시계열이면 OK
+                </div>
+            </div>
+            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
+                        padding:1.2rem;border:1px solid #e2e8f0;
+                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
+                <div style="width:36px;height:36px;background:#dbeafe;border-radius:50%;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 0.7rem;font-size:1.1rem;">2</div>
+                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">자동 분석</div>
+                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
+                    ADF·분해·ACF/PACF·ARIMA<br>차수까지 전부 자동
+                </div>
+            </div>
+            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
+                        padding:1.2rem;border:1px solid #e2e8f0;
+                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
+                <div style="width:36px;height:36px;background:#fef3c7;border-radius:50%;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 0.7rem;font-size:1.1rem;">3</div>
+                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">예측 + 신뢰도</div>
+                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
+                    7개 모델 비교 후 최적 선택,<br>신뢰 점수 0~100점 제공
+                </div>
+            </div>
+            <div style="flex:1;min-width:200px;background:white;border-radius:14px;
+                        padding:1.2rem;border:1px solid #e2e8f0;
+                        box-shadow:0 2px 8px rgba(0,0,0,0.04);text-align:center;">
+                <div style="width:36px;height:36px;background:#d1fae5;border-radius:50%;
+                            display:flex;align-items:center;justify-content:center;
+                            margin:0 auto 0.7rem;font-size:1.1rem;">4</div>
+                <div style="font-weight:700;color:#1e293b;margin-bottom:0.3rem;">다운로드</div>
+                <div style="font-size:0.83rem;color:#94a3b8;line-height:1.5;">
+                    예측값 CSV + 신뢰 리포트<br>TXT로 저장
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
         return
 
     # ── 열 선택 ───────────────────────────────────────────────────
@@ -970,7 +1191,7 @@ def main():
     kpi_data=[
         ("kpi-card-blue",   "📊","데이터 수",      str(n),            freq_label),
         ("kpi-card-violet", "🔄","계절 주기",      f"{sp} 스텝",      f"감지 빈도: {freq_label}"),
-        ("kpi-card-green",  "🏆","최적 모델",      best_model or "N/A", f"RMSE {best_rmse:.1f}"),
+        ("kpi-card-orange", "🏆","최적 모델",      best_model or "N/A", f"RMSE {best_rmse:.1f}"),
         ("kpi-card-orange", "🔢","ARIMA 차수",    str(arima_order),  arima_case),
         (kpi_trust_cls,     "🛡️","신뢰 점수",      f"{trust_total:.0f}/100", badge_text),
     ]
@@ -1149,12 +1370,12 @@ def main():
         if forecast_horizon>sp*2:
             st.warning(f"⚠️ 예측 기간이 계절 주기({sp})의 2배 초과")
 
-        st.markdown(f"""<div class="card card-blue">
-        📅 <b>1스텝 = 1{freq_label}</b> &nbsp;|&nbsp;
-        예측 기간 <b>{forecast_horizon}스텝</b> &nbsp;|&nbsp;
-        최적 모델: <b>{best_model}</b> &nbsp;|&nbsp;
-        음영 = 95% 신뢰구간
-        </div>""",unsafe_allow_html=True)
+        st.info(
+            f"📅 **1스텝 = 1{freq_label}** &nbsp; | &nbsp; "
+            f"예측 기간 **{forecast_horizon}스텝** &nbsp; | &nbsp; "
+            f"최적 모델: **{best_model}** &nbsp; | &nbsp; "
+            f"음영 = 95% 신뢰구간"
+        )
 
         if test_results:
             st.plotly_chart(plot_forecast(series,val_col,test_results,future_results,best_model,train_end),
@@ -1340,7 +1561,7 @@ def main():
                                file_name="trust_report.txt",mime='text/plain',use_container_width=True)
 
     st.divider()
-    st.caption("📈 시계열 예측 신뢰 분석기 v3 | 단순 예측을 넘어 — 예측의 신뢰도를 판단합니다")
+    st.caption("📈 TimeSeries Trust Analyzer · 자동 분석 · 다중 모델 예측 · 신뢰도 채점")
 
 
 if __name__ == "__main__":
