@@ -812,40 +812,29 @@ def get_airpassengers():
 # 메인
 # ══════════════════════════════════════════════════════════════════
 def main():
-    # ── 헤더 ─────────────────────────────────────────────────────
-    st.markdown("""
-    <div class="app-header">
-        <div class="app-title">
-            📈 시계열 예측 <span class="app-title-accent">신뢰 분석기</span>
-        </div>
-        <div class="app-subtitle">
-            데이터를 올리면 자동으로 분석하고, 예측하고, 신뢰도까지 판단합니다
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
     # ── 사이드바 ──────────────────────────────────────────────────
     with st.sidebar:
-        st.markdown("### ⚙️ 설정")
+        st.markdown(
+            '<div style="padding:0.8rem 0 0.2rem;font-size:1rem;font-weight:800;color:#1e293b;">'
+            '📈 시계열 예측 신뢰 분석기</div>'
+            '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:0.8rem;">TimeSeries Trust Analyzer</div>',
+            unsafe_allow_html=True
+        )
+        st.divider()
         data_mode=st.radio("데이터 소스",["CSV 업로드","샘플 데이터 (AirPassengers)"],
                            label_visibility="collapsed")
         uploaded=None
         if data_mode=="CSV 업로드":
             uploaded=st.file_uploader("CSV 파일 업로드",type=['csv'],label_visibility="collapsed")
         st.divider()
-        st.markdown("**모델 설정**")
+        st.markdown('<div style="font-size:0.78rem;font-weight:700;color:#64748b;'
+                    'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">'
+                    'MODEL SETTINGS</div>', unsafe_allow_html=True)
         forecast_horizon=st.slider("예측 기간 (스텝)",1,60,12)
         test_ratio      =st.slider("테스트 비율 (%)",10,40,20)
         use_auto_arima  =st.checkbox("ARIMA 차수 자동 추정",value=True)
         use_sarima      =st.checkbox("SARIMA 포함",value=True,
                                      help="계절성 ARIMA. 30초 내외 소요")
-        st.divider()
-        st.markdown("**📚 적용 강의 개념**")
-        st.markdown("""
-        `ADF` `ACF/PACF` `분해` `AR/MA/ARMA`
-        `ARIMA` `SARIMA` `SES` `Holt` `HW`
-        `잔차진단 4종` `신뢰구간` `Naive 기준선`
-        """)
 
     # ── 데이터 로드 ───────────────────────────────────────────────
     df_raw=None; date_col=None; numeric_cols=[]; val_col=None
@@ -865,6 +854,15 @@ def main():
     else:
         # ══════════════════════════════════════════════════════════
         # 히어로 랜딩 페이지 (간결 버전)
+
+        # 랜딩 페이지: 사이드바를 얇게 + 헤더 숨김
+        st.markdown(
+            '<style>'
+            '[data-testid="stSidebar"]{min-width:220px!important;max-width:220px!important;}'
+            '[data-testid="stSidebar"] .stRadio label{font-size:0.85rem;}'
+            '</style>',
+            unsafe_allow_html=True
+        )
         # ══════════════════════════════════════════════════════════
 
         # ① 히어로 배너 (작게 나눠서 안전하게 렌더링)
@@ -879,7 +877,7 @@ def main():
             'line-height:1.2;margin:0 0 0.8rem 0;letter-spacing:-1px;">'
             '시계열 예측,<br>'
             '<span style="color:#a78bfa;">신뢰도까지 판단합니다</span></h1>'
-            '<p style="color:#94a3b8;font-size:0.95rem;margin:0 0 1.5rem 0;line-height:1.6;">'
+            '<p style="color:#94a3b8;font-size:0.92rem;margin:0 0 1.5rem 0;line-height:1.6;">'
             'CSV 파일 하나로 &nbsp;<strong style="color:#c4b5fd;">자동 분석</strong> →'
             '&nbsp;<strong style="color:#c4b5fd;">7개 모델 예측</strong> →'
             '&nbsp;<strong style="color:#c4b5fd;">신뢰 점수 채점</strong>까지</p>'
@@ -1019,6 +1017,17 @@ def main():
                 )
 
         return
+
+    # ── 데이터 로드 시 컴팩트 헤더 ─────────────────────────────────
+    st.markdown(
+        '<div style="display:flex;align-items:center;gap:0.6rem;'
+        'padding:0.6rem 0 0.2rem;margin-bottom:0.5rem;">'
+        '<span style="font-size:1.3rem;font-weight:900;color:#1e293b;">📈 시계열 예측 신뢰 분석기</span>'
+        '<span style="background:#ede9fe;color:#6d28d9;border-radius:999px;'
+        'padding:2px 10px;font-size:0.72rem;font-weight:700;">ANALYZING</span>'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
     # ── 열 선택 ───────────────────────────────────────────────────
     with st.expander("🔧 열 설정 확인 / 변경",expanded=(date_col is None)):
